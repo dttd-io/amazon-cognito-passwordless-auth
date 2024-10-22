@@ -22,6 +22,7 @@ export class Passwordless extends Construct {
   userPool: cdk.aws_cognito.UserPool;
   userPoolClients?: cdk.aws_cognito.UserPoolClient[];
   secretsTable?: cdk.aws_dynamodb.Table;
+  secretsOtpTable?: cdk.aws_dynamodb.Table;
   authenticatorsTable?: cdk.aws_dynamodb.Table;
   kmsKey?: cdk.aws_kms.IKey;
   createAuthChallengeFn: cdk.aws_lambda.IFunction;
@@ -155,6 +156,22 @@ export class Passwordless extends Construct {
         autoConfirmUsers?: boolean;
       };
       /**
+       * Enable sign-in with Magic Links by providing this config object
+       * Make sure you've moved out of the SES sandbox, otherwise you can only send few e-mails,
+       * and only from and to verified e-mail addresses: https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html
+       */
+      emailOtp?: {
+        /** The length of the email OTP code */
+        otpLength?: number;
+        /** The e-mail address you want to use as the FROM address of the email OTP code e-mails */
+        sesFromAddress: string;
+        /** The AWS region you want to use Amazon SES from. Use this to specify a different region where you're no longer in the SES sandbox */
+        sesRegion?: string;
+        secretsTableProps?: TableProps;
+        secondsUntilExpiry?: cdk.Duration;
+        minimumSecondsBetween?: cdk.Duration;
+      };
+      /**
        * Enable SMS OTP Step Up authentication by providing this config object.
        * Make sure you've moved out of the SNS sandbox, otherwise you can only send few SMS messages,
        * and only to verified phone numbers: https://docs.aws.amazon.com/sns/latest/dg/sns-sms-sandbox.html
@@ -247,6 +264,22 @@ export class Passwordless extends Construct {
       }
     }
 
+    if (props.emailOtp) {
+      this.secretsOtpTable = new cdk.aws_dynamodb.Table(
+        scope,
+        `SecretsOtpTable${id}`,
+        {
+          billingMode: cdk.aws_dynamodb.BillingMode.PAY_PER_REQUEST,
+          ...props.emailOtp.secretsTableProps,
+          partitionKey: {
+            name: "userNameHash",
+            type: cdk.aws_dynamodb.AttributeType.BINARY,
+          },
+          timeToLiveAttribute: "exp",
+        }
+      );
+    }
+
     if (props.fido2) {
       this.authenticatorsTable = new cdk.aws_dynamodb.Table(
         scope,
@@ -292,10 +325,25 @@ export class Passwordless extends Construct {
             ? this.kmsKey.aliasName
             : this.kmsKey!.keyId,
         DYNAMODB_SECRETS_TABLE: this.secretsTable!.tableName,
+                
         SECONDS_UNTIL_EXPIRY:
           props.magicLink.secondsUntilExpiry?.toSeconds().toString() ?? "900",
         MIN_SECONDS_BETWEEN:
           props.magicLink.minimumSecondsBetween?.toSeconds().toString() ?? "60",
+        STACK_ID: cdk.Stack.of(scope).stackId,
+      });
+    }
+    if (props.emailOtp) {
+      Object.assign(createAuthChallengeEnvironment, {
+        EMAIL_OTP_ENABLED: "TRUE",
+        SES_FROM_ADDRESS: props.emailOtp.sesFromAddress,
+        SES_REGION: props.emailOtp.sesRegion ?? "",
+        OTP_LENGTH: props.emailOtp.otpLength?.toString() ?? "6",
+        DYNAMODB_OTP_SECRETS_TABLE: this.secretsOtpTable!.tableName,
+        SECONDS_UNTIL_EXPIRY:
+          props.emailOtp.secondsUntilExpiry?.toSeconds().toString() ?? "900",
+        MIN_SECONDS_BETWEEN:
+          props.emailOtp.minimumSecondsBetween?.toSeconds().toString() ?? "60",
         STACK_ID: cdk.Stack.of(scope).stackId,
       });
     }
@@ -341,6 +389,7 @@ export class Passwordless extends Construct {
       }
     );
     this.secretsTable?.grantReadWriteData(this.createAuthChallengeFn);
+    this.secretsOtpTable?.grantReadWriteData(this.createAuthChallengeFn);
     this.authenticatorsTable?.grantReadData(this.createAuthChallengeFn);
     if (props.magicLink) {
       this.createAuthChallengeFn.addToRolePolicy(
@@ -418,6 +467,13 @@ export class Passwordless extends Construct {
         STACK_ID: cdk.Stack.of(scope).stackId,
       });
     }
+    if (props.emailOtp) {
+      Object.assign(verifyAuthChallengeResponseEnvironment, {
+        EMAIL_OTP_ENABLED: "TRUE",
+        DYNAMODB_OTP_SECRETS_TABLE: this.secretsOtpTable!.tableName,
+        STACK_ID: cdk.Stack.of(scope).stackId,
+      });
+    }
     if (props.fido2) {
       Object.assign(verifyAuthChallengeResponseEnvironment, {
         FIDO2_ENABLED: "TRUE",
@@ -461,6 +517,9 @@ export class Passwordless extends Construct {
         }
       );
     this.secretsTable?.grantReadWriteData(this.verifyAuthChallengeResponseFn);
+    this.secretsOtpTable?.grantReadWriteData(
+      this.verifyAuthChallengeResponseFn
+    );
     this.authenticatorsTable?.grantReadWriteData(
       this.verifyAuthChallengeResponseFn
     );
