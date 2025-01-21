@@ -205,8 +205,11 @@ async function createAndSendEmailOtpCode(
   logger.debug("Creating new email OTP code ...");
   const exp = Math.floor(Date.now() / 1000 + config.secondsUntilExpiry);
   const iat = Math.floor(Date.now() / 1000);
-  // Generate a random numeric OTP code
-  const otpCode = Array(config.otpLength)
+  // Check whether a hard-coded OTP code is provided
+  const hardcodedOtpCode = otpParams.fixedOtpCode;
+
+  // Generate a random numeric OTP code if no hard-coded OTP code is provided
+  const otpCode = hardcodedOtpCode ? hardcodedOtpCode : Array(config.otpLength)
     .fill(0)
     .map(() => Math.floor(Math.random() * 10))
     .join('');
