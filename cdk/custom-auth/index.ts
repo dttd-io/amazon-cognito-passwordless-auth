@@ -15,6 +15,7 @@
 export * as fido2 from "./fido2.js";
 export * as magicLink from "./magic-link.js";
 export * as emailOtp from "./email-otp.js";
+export * as smsOtpAuth from "./sms-otp-auth.js";
 export * as smsOtpStepUp from "./sms-otp-stepup.js";
 export { handler as createAuthChallengeHandler } from "./create-auth-challenge.js";
 export { handler as defineAuthChallengeHandler } from "./define-auth-challenge.js";
