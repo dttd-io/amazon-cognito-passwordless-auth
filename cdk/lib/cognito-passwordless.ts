@@ -172,6 +172,22 @@ export class Passwordless extends Construct {
         minimumSecondsBetween?: cdk.Duration;
       };
       /**
+       * Enable sign-in with SMS OTP Code by providing this config object
+       * Make sure you've moved out of the SNS sandbox, otherwise you can only send few SMS messages,
+       * and only to verified phone numbers: https://docs.aws.amazon.com/sns/latest/dg/sns-sms-sandbox.html
+       */
+      smsOtpAuth?: {
+        /** The length of the SMS OTP code */
+        otpLength?: number;
+        /** The AWS region you want to use Amazon SNS from. Use this to specify a different region where you're no longer in the SNS sandbox */
+        snsRegion?: string;
+        originationNumber?: string;
+        senderId?: string;
+        secretsTableProps?: TableProps;
+        secondsUntilExpiry?: cdk.Duration;
+        minimumSecondsBetween?: cdk.Duration;
+      };
+      /**
        * Enable SMS OTP Step Up authentication by providing this config object.
        * Make sure you've moved out of the SNS sandbox, otherwise you can only send few SMS messages,
        * and only to verified phone numbers: https://docs.aws.amazon.com/sns/latest/dg/sns-sms-sandbox.html
@@ -279,6 +295,22 @@ export class Passwordless extends Construct {
         }
       );
     }
+    if ((props.smsOtpAuth) && (this.secretsOtpTable === undefined)) {
+      this.secretsOtpTable = new cdk.aws_dynamodb.Table(
+        scope,
+        `SecretsOtpTable${id}`,
+        {
+          billingMode: cdk.aws_dynamodb.BillingMode.PAY_PER_REQUEST,
+          ...props.smsOtpAuth.secretsTableProps,
+          partitionKey: {
+            name: "userNameHash",
+            type: cdk.aws_dynamodb.AttributeType.BINARY,
+          },
+          timeToLiveAttribute: "exp",
+        }
+      );
+    }
+      
 
     if (props.fido2) {
       this.authenticatorsTable = new cdk.aws_dynamodb.Table(
@@ -344,6 +376,20 @@ export class Passwordless extends Construct {
           props.emailOtp.secondsUntilExpiry?.toSeconds().toString() ?? "900",
         MIN_SECONDS_BETWEEN:
           props.emailOtp.minimumSecondsBetween?.toSeconds().toString() ?? "60",
+        STACK_ID: cdk.Stack.of(scope).stackId,
+      });
+    }
+    if (props.smsOtpAuth) {
+      Object.assign(createAuthChallengeEnvironment, {
+        SMS_OTP_ENABLED: "TRUE",
+        SNS_REGION: props.smsOtpAuth.snsRegion ?? "",
+        ORIGINATION_NUMBER: props.smsOtpAuth.originationNumber ?? "",
+        SENDER_ID: props.smsOtpAuth.senderId ?? "",
+        DYNAMODB_OTP_SECRETS_TABLE: this.secretsOtpTable!.tableName,
+        SECONDS_UNTIL_EXPIRY:
+          props.smsOtpAuth.secondsUntilExpiry?.toSeconds().toString() ?? "900",
+        MIN_SECONDS_BETWEEN:
+          props.smsOtpAuth.minimumSecondsBetween?.toSeconds().toString() ?? "60",
         STACK_ID: cdk.Stack.of(scope).stackId,
       });
     }
@@ -470,6 +516,13 @@ export class Passwordless extends Construct {
     if (props.emailOtp) {
       Object.assign(verifyAuthChallengeResponseEnvironment, {
         EMAIL_OTP_ENABLED: "TRUE",
+        DYNAMODB_OTP_SECRETS_TABLE: this.secretsOtpTable!.tableName,
+        STACK_ID: cdk.Stack.of(scope).stackId,
+      });
+    }
+    if (props.smsOtpAuth) {
+      Object.assign(verifyAuthChallengeResponseEnvironment, {
+        SMS_OTP_ENABLED: "TRUE",
         DYNAMODB_OTP_SECRETS_TABLE: this.secretsOtpTable!.tableName,
         STACK_ID: cdk.Stack.of(scope).stackId,
       });
