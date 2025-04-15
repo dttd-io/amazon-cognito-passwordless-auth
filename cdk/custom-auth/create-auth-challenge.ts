@@ -20,6 +20,7 @@ import * as fido2 from "./fido2.js";
 import * as smsOtpStepUp from "./sms-otp-stepup.js";
 import * as magicLink from "./magic-link.js";
 import * as emailOtp from "./email-otp.js";
+import * as smsOtpAuth from "./sms-otp-auth.js";
 import { logger, UserFacingError } from "./common.js";
 
 export const handler: CreateAuthChallengeTriggerHandler = async (event) => {
@@ -46,6 +47,8 @@ export const handler: CreateAuthChallengeTriggerHandler = async (event) => {
         await smsOtpStepUp.addChallengeToEvent(event);
       } else if (signInMethod === "EMAIL_OTP_CODE") {
         await emailOtp.addChallengeToEvent(event);
+      } else if (signInMethod === "SMS_OTP_CODE") {
+        await smsOtpAuth.addChallengeToEvent(event);
       } else {
         throw new Error(`Unrecognized signInMethod: ${signInMethod}`);
       }

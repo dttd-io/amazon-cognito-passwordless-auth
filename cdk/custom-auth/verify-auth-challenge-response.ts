@@ -18,6 +18,7 @@ import * as fido2 from "./fido2.js";
 import * as smsOtpStepUp from "./sms-otp-stepup.js";
 import * as magicLink from "./magic-link.js";
 import * as emailOtp from "./email-otp.js";
+import * as smsOtpAuth from "./sms-otp-auth.js";
 import { logger, UserFacingError } from "./common.js";
 
 export const handler: VerifyAuthChallengeResponseTriggerHandler = async (
@@ -43,6 +44,8 @@ export const handler: VerifyAuthChallengeResponseTriggerHandler = async (
       await smsOtpStepUp.addChallengeVerificationResultToEvent(event);
     } else if (event.request.clientMetadata?.signInMethod === "EMAIL_OTP_CODE") {
       await emailOtp.addChallengeVerificationResultToEvent(event);
+    } else if (event.request.clientMetadata?.signInMethod === "SMS_OTP_CODE") {
+      await smsOtpAuth.addChallengeVerificationResultToEvent(event);
     }
 
     // Return event

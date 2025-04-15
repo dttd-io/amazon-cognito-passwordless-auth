@@ -50,6 +50,8 @@ export const handler: DefineAuthChallengeTriggerHandler = async (event) => {
     return handleFido2Response(event);
   } else if (signInMethod === "EMAIL_OTP_CODE") {
     return handleEmailOtpCodeResponse(event);
+  } else if (signInMethod === "SMS_OTP_CODE") {
+    return handleSmsOtpAuthResponse(event);
   }
   return deny(event, `Unrecognized signInMethod: ${signInMethod}`);
 };
@@ -102,6 +104,19 @@ function handleEmailOtpCodeResponse(event: DefineAuthChallengeTriggerEvent) {
   return deny(event, "Failed to authenticate with Email OTP Code");
 }
 
+function handleSmsOtpAuthResponse(event: DefineAuthChallengeTriggerEvent) {
+  logger.info("Checking SMS OTP Code Auth ...");
+  const lastResponse = event.request.session.slice(-1)[0];
+  const { alreadyHaveSmsOtpCode } = event.request.clientMetadata ?? {};
+  if (lastResponse.challengeResult === true) {
+    return allow(event);
+  } else if (alreadyHaveSmsOtpCode !== "yes" && countAttempts(event) === 0) {
+    logger.info("No SMS OTP code yet, creating one");
+    return customSmsOtpAuthChallenge(event);
+  }
+  return deny(event, "Failed to authenticate with SMS OTP Code");
+}
+
 function deny(event: DefineAuthChallengeTriggerEvent, reason: string) {
   logger.info("Failing authentication because:", reason);
   event.response.issueTokens = false;
@@ -132,6 +147,15 @@ function customEmailOtpCodeChallenge(event: DefineAuthChallengeTriggerEvent) {
   event.response.failAuthentication = false;
   event.response.challengeName = "CUSTOM_CHALLENGE";
   logger.info("Next step: CUSTOM_CHALLENGE (Email OTP Code)");
+  logger.debug(JSON.stringify(event, null, 2));
+  return event;
+}
+
+function customSmsOtpAuthChallenge(event: DefineAuthChallengeTriggerEvent) {
+  event.response.issueTokens = false;
+  event.response.failAuthentication = false;
+  event.response.challengeName = "CUSTOM_CHALLENGE";
+  logger.info("Next step: CUSTOM_CHALLENGE (SMS OTP Code)");
   logger.debug(JSON.stringify(event, null, 2));
   return event;
 }
