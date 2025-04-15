@@ -1,6 +1,6 @@
 {
   "name": "amazon-cognito-passwordless-auth",
-  "version": "0.14.2",
+  "version": "0.14.2-dg",
   "description": "Passwordless authentication with Amazon Cognito: FIDO2 (WebAuthn, support for Passkeys), Magic Link, SMS OTP Step Up",
   "keywords": [
     "AWS",
@@ -62,6 +62,10 @@
     "./magic-link": {
       "import": "./dist/client/magic-link.js",
       "types": "./magic-link.d.ts"
+    },
+    "./email-otp": {
+      "import": "./dist/client/email-otp.js",
+      "types": "./email-otp.d.ts"
     },
     "./passwordless.css": "./dist/client/passwordless.css",
     "./plaintext": {
@@ -126,6 +130,7 @@
     "cognito-api.d.ts",
     "common.d.ts",
     "config.d.ts",
+    "email-otp.d.ts",
     "fido2.d.ts",
     "index.d.ts",
     "jwt-model.d.ts",
